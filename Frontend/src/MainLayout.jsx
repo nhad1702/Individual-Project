@@ -9,7 +9,7 @@ const MainLayout = ({ children }) => {
     return (
         <div data-theme={theme} className="min-h-screen w-full bg-[#F6F7F9] dark:bg-gray-900">
             <Header />
-            {children}
+                <main className="w-full py-4 px-16">{children}</main>
             <Footer />
         </div>
     )
