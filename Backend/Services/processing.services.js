@@ -1,7 +1,7 @@
 import FileUpload from "../models/FileUpload.js";
 import Question from "../models/Question.js";
-import { extractTextFromImage } from "../utils/ocr.util.js";
-import { generateQuestionsFromText } from "../utils/ai.util.js";
+import { extractTextFromImage } from "../Utils/OCR/OCR.utils.js";
+import { generateQuestionsFromText } from "../Utils/AI/AI.utils.js";
 
 export async function processFile(fileUploadId) {
   const file = await FileUpload.findById(fileUploadId);

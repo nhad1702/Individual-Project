@@ -1,37 +1,70 @@
-import { extractTextFromImage } from '../Utils/OCR/OCR.utils.js'
-import { openAIGenerateQuestionsFromText } from '../Utils/AI/openAI.utils.js'
-import { ollamaGenerateQuestionsFromText } from '../Utils/AI/ollamaAI.utils.js'
+import assert from 'assert';
+import { extractTextFromImage } from '../Utils/OCR/OCR.utils.js';
+import { generateQuestionsFromText } from '../Utils/AI/AI.utils.js';
 
-const testOCRAndAI = async () => {
-    try {
-        // const imgPath = './Tests/example.png';
-        // const imgPath1 = './Tests/example1.jpg';
-        const imgPath2 = './Tests/example2.jpg';
-        // const imgPath3 = './Tests/example3.jpg';
+process.env.AI_PROVIDER = process.env.AI_PROVIDER || 'ollama';
 
-        console.log("🔍 Running OCR...");
-        // const text = await extractTextFromImage(imgPath);
-        // const text1 = await extractTextFromImage(imgPath1);
-        const text2 = await extractTextFromImage(imgPath2);
-        // const text3 = await extractTextFromImage(imgPath3);
+const exampleImage = './Tests/IMG_0126.jpg';
+const allowedTypes = ['multiple_choice', 'true_false', 'short_answer'];
+const allowedDifficulties = ['easy', 'medium', 'hard'];
 
-        console.log("\n===== OCR RESULT =====\n");
-        // console.log(text);
-        // console.log(text1);
-        console.log(text2);
-        // console.log(text3);
+const validateQuestion = (question, index) => {
+  assert(question, `Question ${index} is missing`);
+  assert.strictEqual(typeof question.questionText, 'string', `Question ${index} must have a questionText`);
+  assert(question.questionText.trim().length > 0, `Question ${index} questionText cannot be empty`);
+  assert(allowedTypes.includes(question.type), `Question ${index} has invalid type: ${question.type}`);
+  assert(allowedDifficulties.includes(question.difficulty), `Question ${index} has invalid difficulty: ${question.difficulty}`);
+  assert.strictEqual(typeof question.answer, 'string', `Question ${index} must include an answer string`);
 
-        // console.log("\n🤖 Sending to OpenAI...\n");
-        // const openaiQuestions = await openAIGenerateQuestionsFromText(text);
-
-        // console.log("\n🤖 Sending to Ollama...\n");
-        // const questions = await ollamaGenerateQuestionsFromText(text);
-
-        // console.log("\n===== AI QUESTIONS =====\n");
-        // console.log(JSON.stringify(questions, null, 2));
-    } catch (error) {
-        console.error("❌ Error:", error.message);
+  if (question.type === 'multiple_choice') {
+    assert(Array.isArray(question.options), `Question ${index} multiple_choice options must be an array`);
+    assert(question.options.length >= 2, `Question ${index} must include at least 2 options`);
+    assert(question.options.some(opt => opt.isCorrect), `Question ${index} must include one correct option`);
+  } else {
+    assert(Array.isArray(question.options), `Question ${index} options must be an array`);
+    assert.strictEqual(question.options.length, 0, `Question ${index} of type ${question.type} must not include options`);
+    if (question.type === 'true_false') {
+      assert(['true', 'false'].includes(question.answer.toLowerCase().trim()), `Question ${index} true_false answer must be "true" or "false"`);
     }
-}
+  }
+};
 
-testOCRAndAI()
+const runOCRAndAITest = async () => {
+  try {
+    console.log('🔍 Running OCR...');
+    const text = await extractTextFromImage(exampleImage);
+
+    console.log('\n===== OCR RESULT =====\n');
+    console.log(text);
+
+    console.log('\n🤖 Sending OCR text to AI provider...\n');
+    const questions = await generateQuestionsFromText(text);
+
+    assert(Array.isArray(questions), 'AI output must be an array');
+    assert(questions.length > 0, 'AI output must contain at least one question');
+
+    let foundMultipleChoice = false;
+    let foundTrueFalse = false;
+    let foundShortAnswer = false;
+
+    questions.forEach((question, index) => {
+      validateQuestion(question, index + 1);
+      if (question.type === 'multiple_choice') foundMultipleChoice = true;
+      if (question.type === 'true_false') foundTrueFalse = true;
+      if (question.type === 'short_answer') foundShortAnswer = true;
+    });
+
+    assert(foundMultipleChoice, 'Expected at least one multiple_choice question');
+    assert(foundTrueFalse, 'Expected at least one true_false question');
+    assert(foundShortAnswer, 'Expected at least one short_answer question');
+
+    console.log('✅ OCR/AI regression test passed!');
+    console.log('\n===== AI QUESTIONS =====\n');
+    console.log(JSON.stringify(questions, null, 2));
+  } catch (error) {
+    console.error('❌ OCR/AI regression failed:', error.message || error);
+    process.exit(1);
+  }
+};
+
+runOCRAndAITest();
